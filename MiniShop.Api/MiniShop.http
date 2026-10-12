@@ -1,0 +1,17 @@
+@host = https://localhost:7150
+
+### Lista proizvoda
+GET {{host}}/api/products
+Accept: application/json
+
+### Jedan proizvod
+GET {{host}}/api/products/1
+Accept: application/json
+
+### Nepostojeci proizvod -> 404
+GET {{host}}/api/products/999
+Accept: application/json
+
+### Neispravan id -> 404 vec od rutiranja ({id:int})
+GET {{host}}/api/products/abc
+Accept: application/json
