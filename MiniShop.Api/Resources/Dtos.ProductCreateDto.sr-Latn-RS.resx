@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="Product_Name_Required" xml:space="preserve">
+    <value>Naziv je obavezan.</value>
+  </data>
+  <data name="Product_Name_Length" xml:space="preserve">
+    <value>Naziv mora imati izmedju {2} i {1} znakova.</value>
+  </data>
+  <data name="Product_Sku_Required" xml:space="preserve">
+    <value>Sifra proizvoda (SKU) je obavezna.</value>
+  </data>
+  <data name="Product_Sku_Length" xml:space="preserve">
+    <value>Sifra proizvoda ne sme biti duza od {1} znakova.</value>
+  </data>
+  <data name="Product_Description_Length" xml:space="preserve">
+    <value>Opis ne sme biti duzi od {1} znakova.</value>
+  </data>
+  <data name="Product_Price_Range" xml:space="preserve">
+    <value>Cena mora biti izmedju {1} i {2}.</value>
+  </data>
+  <data name="Product_Stock_Range" xml:space="preserve">
+    <value>Kolicina na stanju ne sme biti negativna.</value>
+  </data>
+  <data name="Product_Category_Range" xml:space="preserve">
+    <value>Kategorija mora biti zadata (Id veci od 0).</value>
+  </data>
+  <data name="Product_Email_Invalid" xml:space="preserve">
+    <value>E-adresa dobavljaca nije ispravna.</value>
+  </data>
+</root>

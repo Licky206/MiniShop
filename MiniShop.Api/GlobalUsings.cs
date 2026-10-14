@@ -26,4 +26,10 @@ global using Scalar.AspNetCore;                     // paket Scalar.AspNetCore
 // global using FluentValidation;                               // paket (nedelja 6)
 
 // ---------- namespace-ovi projekta MiniShop.Api ----------
-global using MiniShop.Api.Models;
+global using MiniShop.Api.Dtos;
+global using MiniShop.Api.Errors;
+global using MiniShop.Api.Extensions;
+global using MiniShop.Api.Filters;
+global using MiniShop.Api.Middleware;
+global using MiniShop.Api.Options;
+global using MiniShop.Api.Services;

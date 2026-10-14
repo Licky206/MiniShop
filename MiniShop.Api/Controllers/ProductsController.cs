@@ -2,27 +2,57 @@ namespace MiniShop.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ProductsController : ControllerBase
+public class ProductsController(IProductService svc) : ControllerBase
 {
-    // podaci su u memoriji do nedelje 4 (baza); u nedelji 2 sele u servis
-    private static readonly List<Product> _items =
-    [
-        new(1, "Tastatura", 4990m, 1),
-        new(2, "Mis", 2490m, 1),
-        new(3, "Monitor 27", 32990m, 2)
-    ];
-
+    // GET /api/products?search=&categoryId=&minPrice=&maxPrice=&sort=&page=&pageSize=
     [HttpGet]
-    public ActionResult<IEnumerable<Product>> GetAll()
-        => Ok(_items);
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> Get(
+        [FromQuery] ProductQuery q, CancellationToken ct)
+        => Ok(await svc.GetAllAsync(q, ct));
 
     [HttpGet("{id:int}")]
-    public ActionResult<Product> GetById(int id)
+    public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
-        var item = _items.FirstOrDefault(p => p.Id == id);
-
-        return item is null
-            ? NotFound()
-            : Ok(item);
+        var product = await svc.GetByIdAsync(id, ct);
+        return product is null
+            ? this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
+                "Proizvod ne postoji."))
+            : Ok(product);
     }
+
+    // fiksni segment; ne sudara se sa {id:int} jer "featured" nije broj
+    [HttpGet("featured")]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> Featured(CancellationToken ct)
+        => Ok(await svc.GetAllAsync(
+            new ProductQuery(null, null, null, null, "price_desc", 1, 5), ct));
+
+    [HttpPost]
+    public async Task<IActionResult> Create(ProductCreateDto dto, CancellationToken ct)
+    {
+        var created = await svc.CreateAsync(dto, ct);
+        if (created is null)
+            return this.ToProblem(new Error(ErrorType.Conflict, "duplicate-sku",
+                "Proizvod sa tim SKU vec postoji."));
+
+        // 201 + Location: /api/products/{id}
+        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(
+        int id, ProductUpdateDto dto, CancellationToken ct)
+    {
+        var updated = await svc.UpdateAsync(id, dto, ct);
+        return updated is null
+            ? this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
+                "Proizvod ne postoji."))
+            : NoContent();
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+        => await svc.DeleteAsync(id, ct)
+            ? NoContent()
+            : this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
+                "Proizvod ne postoji."));
 }
