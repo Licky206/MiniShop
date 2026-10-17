@@ -6,6 +6,14 @@ namespace MiniShop.Api.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class ProductsController(IProductService svc) : ControllerBase
 {
+    // dozvoljeni tipovi: MIME tip -> (magicni bajtovi, ekstenzija na disku)
+    private static readonly Dictionary<string, (byte[] Magic, string Ext)> ImageTypes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["image/jpeg"] = (new byte[] { 0xFF, 0xD8, 0xFF }, ".jpg"),
+            ["image/png"] = (new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, ".png")
+        };
+
     /// <summary>Vraca paginiranu listu aktivnih proizvoda.</summary>
     /// <remarks>
     /// Filteri: search (deo naziva), categoryId, minPrice, maxPrice.
@@ -22,7 +30,6 @@ public class ProductsController(IProductService svc) : ControllerBase
     {
         var page = await svc.GetPageAsync(q, ct);
 
-        // isti metapodaci i u zaglavlju: za HEAD zahteve i klijente koji ne citaju telo
         Response.Headers["X-Pagination"] = JsonSerializer.Serialize(new
         {
             page.Page,
@@ -42,13 +49,12 @@ public class ProductsController(IProductService svc) : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ProductDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> GetById(int id, CancellationToken ct)
+    public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await svc.GetDetailsAsync(id, ct);
         if (!result.IsSuccess)
             return this.ToProblem(result.Error!.Value);
 
-        // ETag sa verzijom reda ostaje (nedelje 5 i 6)
         var version = await svc.GetRowVersionAsync(id, ct);
         if (version is not null)
             Response.Headers.ETag = $"\"{Convert.ToBase64String(version)}\"";
@@ -104,5 +110,53 @@ public class ProductsController(IProductService svc) : ControllerBase
     {
         var r = await svc.DeleteAsync(id, ct);
         return r.IsSuccess ? NoContent() : this.ToProblem(r.Error!.Value);
+    }
+
+    /// <summary>Postavlja sliku proizvoda (JPEG ili PNG, najvise 5 MB).</summary>
+    /// <response code="200">Slika je sacuvana; telo sadrzi njen URL.</response>
+    /// <response code="400">Fajl nije poslat, prazan je ili sadrzaj ne odgovara tipu.</response>
+    /// <response code="404">Proizvod ne postoji.</response>
+    [HttpPost("{id:int}/image")]
+    [RequestSizeLimit(5 * 1024 * 1024)] // 5 MB: vece telo se odbija pre citanja
+    // privremeno bez autorizacije; od nedelje 11: [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> UploadImage(
+        int id, IFormFile file, CancellationToken ct)
+    {
+        if (file.Length == 0)
+            return FileProblem("Fajl je prazan.");
+
+        if (!ImageTypes.TryGetValue(file.ContentType, out var type))
+            return FileProblem("Dozvoljeni su samo JPEG i PNG.");
+
+        if (file.Length < type.Magic.Length)
+            return FileProblem("Fajl je prekratak da bi bio slika.");
+
+        await using var stream = file.OpenReadStream();
+
+        var head = new byte[type.Magic.Length];
+        await stream.ReadExactlyAsync(head, ct);
+
+        if (!head.SequenceEqual(type.Magic))
+            return FileProblem("Sadrzaj fajla ne odgovara tipu.");
+
+        stream.Position = 0;
+
+        // Ime pravimo sami: GUID + ekstenzija iz whitelist-e,
+        // nikad FileName od klijenta.
+        var name = $"{Guid.NewGuid():N}{type.Ext}";
+
+        var result = await svc.SetImageAsync(
+            id, name, stream, file.ContentType, ct);
+
+        return result.IsSuccess
+            ? Ok(new { url = result.Value })
+            : this.ToProblem(result.Error!.Value);
+    }
+
+    // 400 u istom obliku kao automatska validacija: errors.file = [poruka]
+    private IActionResult FileProblem(string message)
+    {
+        ModelState.AddModelError("file", message);
+        return ValidationProblem(ModelState);
     }
 }

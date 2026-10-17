@@ -15,3 +15,4 @@ public record ShippingAddressDto(string Street, string City, string PostalCode, 
 
 // lista narudzbenica bez stavki (GET /orders/mine, nedelja 10)
 public record OrderSummaryDto(int Id, DateTime CreatedAt, OrderStatus Status, decimal Total);
+public record OrderStatusUpdateDto(OrderStatus Status);

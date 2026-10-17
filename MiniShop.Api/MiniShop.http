@@ -1,47 +1,101 @@
-### 1) strana 2 od 3 -> 200, items: Proizvod 06..10, totalCount 12, totalPages 3,
-###    hasNext true, hasPrevious true; isti podaci u zaglavlju X-Pagination
-GET https://localhost:7150/api/v1/products?page=2&pageSize=5
+### 1) detalji -> 200, priceEur = price x 0.00853 zaokruzeno (Proizvod 01: 1000 -> 8.53), bez imageUrl
+GET https://localhost:7150/api/v1/products/1
 
-### 2) kategorija + sort -> 200, totalCount 4, prvi "Proizvod 12" (12000), poslednji "Proizvod 03"
-GET https://localhost:7150/api/v1/products?categoryId=1&sort=price_desc
+### 2) lista -> 200, stavke su i dalje ProductDto (bez priceEur i imageUrl)
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5
 
-### 3) cena 5000-9000 -> 200, totalCount 5 (Proizvod 05..09)
-GET https://localhost:7150/api/v1/products?minPrice=5000&maxPrice=9000
+### 3) stub u rezim greske -> 200, { "mode": "fail" }
+POST http://localhost:5299/mode/fail
 
-### 4) pretraga -> 200, totalCount 3 (Proizvod 10, 11, 12)
-GET https://localhost:7150/api/v1/products?search=Proizvod%201
+### 4) posle najmanje 60 s od zahteva 1 -> 200, isti priceEur (fallback iz kesa)
+GET https://localhost:7150/api/v1/products/1
 
-### 5) preveliki pageSize -> 200, "pageSize": 100, dvanaest stavki, totalPages 1
-GET https://localhost:7150/api/v1/products?pageSize=1000
+### 5) ponovite 4 jos dva puta; treci put odgovor stize za nekoliko ms (prekidac otvoren)
+GET https://localhost:7150/api/v1/products/1
 
-### 6) nedozvoljen sort -> 400, type .../errors/validation, errors.sort sa spiskom polja
-GET https://localhost:7150/api/v1/products?sort=weight
+### 6) stub nazad u ok; posle 15 s sledeci zahtev 4 prolazi kroz servis (Half-open -> Closed)
+POST http://localhost:5299/mode/ok
 
-### 7) stara ruta bez verzije -> 404
-GET https://localhost:7150/api/products
+### 7) CORS preflight sa dev origin-a -> 204, Access-Control-Allow-Origin: http://localhost:5173
+OPTIONS https://localhost:7150/api/v1/products/1
+Origin: http://localhost:5173
+Access-Control-Request-Method: PUT
+Access-Control-Request-Headers: content-type
 
-### 8) nova kategorija -> 201, Location: /api/v1/categories/4
-POST https://localhost:7150/api/v1/categories
+### 8) preflight sa nepoznatog origin-a -> 204, ali BEZ Access-Control-Allow-Origin
+OPTIONS https://localhost:7150/api/v1/products/1
+Origin: https://evil.example
+Access-Control-Request-Method: PUT
+
+### 9a) narudzbenica za proveru statusa -> 201 (posle faze 7 baza nema narudzbenica)
+POST https://localhost:7150/api/v1/orders
+Content-Type: application/json
+X-Demo-User: kupac-1
+
+{ "items": [ { "productId": 1, "quantity": 1 } ],
+  "shipping": { "street": "Ulica 1", "city": "Beograd", "postalCode": "11000", "country": "RS" } }
+
+### 9) promena statusa -> 204 (stranica orders.html prikazuje "narudzbenica 1: Shipped")
+POST https://localhost:7150/api/v1/orders/1/status
 Content-Type: application/json
 
-{ "name": "Kablovi", "slug": "kablovi" }
+{ "status": "Shipped" }
 
-### 9) isti slug -> 409, type .../errors/duplicate-slug
-POST https://localhost:7150/api/v1/categories
+### 10) nepostojeca narudzbenica -> 404, type https://minishop.rs/errors/order-not-found
+POST https://localhost:7150/api/v1/orders/999/status
 Content-Type: application/json
 
-{ "name": "Kablovi i adapteri", "slug": "kablovi" }
+{ "status": "Shipped" }
 
-### 10) izmena -> 204; brisanje prazne -> 204
-PUT https://localhost:7150/api/v1/categories/4
+
+
+
+////// AUTH
+
+
+### 1) registracija kupca -> 201, Location: /api/v1/auth/me, telo { id, email }
+POST https://localhost:7150/api/v1/auth/register
 Content-Type: application/json
 
-{ "name": "Kablovi i adapteri", "slug": "kablovi-adapteri" }
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!", "fullName": "Petar Kupac" }
 
-###
-DELETE https://localhost:7150/api/v1/categories/4
+### 2) ista e-adresa -> 400, errors: DuplicateUserName i DuplicateEmail
+POST https://localhost:7150/api/v1/auth/register
+Content-Type: application/json
 
-### 11) kategorija sa proizvodima -> 409, type .../errors/category-not-empty
-DELETE https://localhost:7150/api/v1/categories/1
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!" }
 
-### 12) jezik: bez zaglavlja title "Proizvod 999 ne postoji.", Content-Language: sr-Latn-RS
+### 3) slaba lozinka -> 400, errors: PasswordTooShort, PasswordRequiresDigit, PasswordRequiresUpper
+POST https://localhost:7150/api/v1/auth/register
+Content-Type: application/json
+
+{ "email": "slaba@minishop.rs", "password": "kratka" }
+
+### 4) prijava kupca -> 200, { userId, email, roles: ["Customer"] }
+POST https://localhost:7150/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!" }
+
+### 5) prijava admina -> 200, roles: ["Admin"]
+POST https://localhost:7150/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "admin@minishop.rs", "password": "Admin!Lozinka2026" }
+
+### 6) nepostojeci nalog -> 401, isti odgovor kao pogresna lozinka
+POST https://localhost:7150/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "niko@minishop.rs", "password": "Lozinka123!" }
+
+### 7) bez tokena -> 401, zaglavlje WWW-Authenticate: Bearer
+GET https://localhost:7150/api/v1/auth/me
+
+### 8) narudzbenica bez tokena -> 401 (radi ponovo od nedelje 10)
+POST https://localhost:7150/api/v1/orders
+Content-Type: application/json
+
+{ "items": [ { "productId": 1, "quantity": 1 } ],
+  "shipping": { "street": "Bulevar oslobodjenja 1", "city": "Novi Sad",
+                "postalCode": "21000", "country": "RS" } }

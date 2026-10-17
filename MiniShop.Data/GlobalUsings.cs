@@ -10,3 +10,9 @@ global using MiniShop.Application.Common;
 global using MiniShop.Application.Dtos;
 global using MiniShop.Application.Mapping;
 global using MiniShop.Data.Repositories;
+global using Microsoft.AspNetCore.Identity;                        // UserManager, RoleManager
+global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;    // IdentityDbContext
+global using Microsoft.AspNetCore.Identity;                        // UserManager, RoleManager
+global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;    // IdentityDbContext
+global using Microsoft.Extensions.Configuration;                   // IConfiguration
+global using Microsoft.Extensions.DependencyInjection;             // GetRequiredService

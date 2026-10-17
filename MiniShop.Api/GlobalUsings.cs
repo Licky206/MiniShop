@@ -50,3 +50,10 @@ global using MiniShop.Api.Clients;
 global using MiniShop.Api.Http;
 global using MiniShop.Api.Hubs;
 global using MiniShop.Api.Storage;
+global using Microsoft.AspNetCore.Identity;
+global using Microsoft.AspNetCore.Authentication.JwtBearer;
+
+global using System.IdentityModel.Tokens.Jwt;             // JwtSecurityToken, claim imena
+global using System.Security.Cryptography;                // SHA256, RandomNumberGenerator
+global using Microsoft.IdentityModel.Tokens;              // SymmetricSecurityKey, Base64UrlEncoder
+global using MiniShop.Api.Auth;

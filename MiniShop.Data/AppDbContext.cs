@@ -1,21 +1,25 @@
 ﻿namespace MiniShop.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options), IUnitOfWork
+    : IdentityDbContext<AppUser>(options), IUnitOfWork
 {
+    // Users, Roles, UserRoles i ostale Identity tabele dolaze iz IdentityDbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        // ucitava sve IEntityTypeConfiguration klase iz ovog asemblija
-        b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        // PRVO Identity: kljucevi, indeksi i relacije AspNet* tabela
         base.OnModelCreating(b);
+
+        // zatim nase IEntityTypeConfiguration klase (ukljucujuci AppUserConfiguration)
+        b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 
-    // unit of work za Application sloj: EF izuzetak ne izlazi iz Data sloja
+    // unit of work za Application sloj (nedelja 6): EF izuzetak ne izlazi iz Data sloja
     async Task<int> IUnitOfWork.SaveChangesAsync(CancellationToken ct)
     {
         try

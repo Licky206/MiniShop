@@ -1,39 +1,29 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using MiniShop.Application;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
-// jezik poruka iz .resx: do nedelje 7 fiksno srpski; tada ga bira Accept-Language.
-// Menja se samo UI kultura (tekstovi), ne i format brojeva i datuma.
-
-//TRECA NEDELJA
-//System.Globalization.CultureInfo.DefaultThreadCurrentUICulture =
-//   System.Globalization.CultureInfo.GetCultureInfo("sr-Latn-RS");
-
-// 1) registracija servisa u DI kontejner
+// ---------- osnovno ----------
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 
 builder.Services
-    .AddControllers(o => o.Filters.Add<AuditFilter>())       // audit za sve akcije
+    .AddControllers(o => o.Filters.Add<AuditFilter>())
     .AddJsonOptions(o =>
     {
         var j = o.JsonSerializerOptions;
         j.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         j.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        j.Converters.Add(new JsonStringEnumConverter());       // enum kao string
-        j.NumberHandling = JsonNumberHandling.Strict;          // "4990" nije broj
-    })
-    .AddDataAnnotationsLocalization(o =>
-        // svi DTO-ovi dele jedan skup prevoda: Resources/Dtos.ProductCreateDto.*.resx
-        o.DataAnnotationLocalizerProvider = (_, factory) =>
-            factory.Create(typeof(ProductCreateDto)));
+        j.Converters.Add(new JsonStringEnumConverter());
+        j.NumberHandling = JsonNumberHandling.Strict;
+    });
 
 builder.Services
     .AddApiVersioning(o =>
     {
         o.DefaultApiVersion = new ApiVersion(1, 0);
         o.AssumeDefaultVersionWhenUnspecified = true;
-        o.ReportApiVersions = true;                 // zaglavlje api-supported-versions
+        o.ReportApiVersions = true;
         o.ApiVersionReader = ApiVersionReader.Combine(
             new UrlSegmentApiVersionReader(),
             new HeaderApiVersionReader("X-Api-Version"));
@@ -41,11 +31,10 @@ builder.Services
     .AddMvc()
     .AddApiExplorer(o =>
     {
-        o.GroupNameFormat = "'v'VVV";               // 1.0 -> "v1" = ime OpenAPI dokumenta
-        o.SubstituteApiVersionInUrl = true;         // u dokumentu /api/v1/..., ne v{version}
+        o.GroupNameFormat = "'v'VVV";
+        o.SubstituteApiVersionInUrl = true;
     });
 
-// OpenAPI dokument "v1" (isto ime kao grupa iz AddApiExplorer) sa opisom i Bearer semom
 builder.Services.AddOpenApi("v1", o =>
 {
     o.AddDocumentTransformer((doc, _, _) =>
@@ -57,93 +46,208 @@ builder.Services.AddOpenApi("v1", o =>
             Description = "Katalog proizvoda, kategorije i narudzbenice."
         };
 
-        // .NET 10 (Microsoft.OpenApi 2.x): Components i SecuritySchemes mogu biti null,
-        // a vrednosti recnika su IOpenApiSecurityScheme (.NET 9 / 1.x: OpenApiSecurityScheme)
         doc.Components ??= new OpenApiComponents();
-        doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            Description = "JWT pristupni token, bez prefiksa Bearer (izdaje se od nedelje 10)."
-        };
+        doc.Components.SecuritySchemes ??=
+            new Dictionary<string, IOpenApiSecurityScheme>();
+
+        doc.Components.SecuritySchemes["Bearer"] =
+            new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description =
+                    "JWT pristupni token, bez prefiksa Bearer (izdaje se od nedelje 10)."
+            };
+
         return Task.CompletedTask;
     });
 });
 
-// Location: /api/products/6, a ne /api/Products/6 (ime kontrolera)
 builder.Services.AddRouting(o => o.LowercaseUrls = true);
 
-// greske: ProblemDetails + globalni handler (Errors/GlobalExceptionHandler.cs)
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// konfiguracija: sekcija Catalog -> CatalogOptions, provera pri startu
 builder.Services.AddOptions<CatalogOptions>()
     .Bind(builder.Configuration.GetSection(CatalogOptions.Section))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-
+// ---------- slojevi ----------
 builder.Services
-    .AddDataLayer(builder.Configuration, builder.Environment.IsDevelopment())
+    .AddDataLayer(
+        builder.Configuration,
+        builder.Environment.IsDevelopment())
     .AddApplicationLayer();
 
-builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
-
+// ---------- lokalizacija (nedelja 7) ----------
 var cultures = new[] { "sr-Latn-RS", "sr-Cyrl-RS", "en" };
+
 builder.Services.Configure<RequestLocalizationOptions>(o =>
 {
     o.SetDefaultCulture("sr-Latn-RS")
-     .AddSupportedCultures(cultures)       // formatiranje brojeva i datuma
-     .AddSupportedUICultures(cultures);    // izbor .resx fajla
-    o.ApplyCurrentCultureToResponseHeaders = true;   // Content-Language u odgovoru
-    o.FallBackToParentUICultures = true;             // en-GB -> en
-    // API ne pamti jezik izmedju zahteva: bez cookie provajdera
+        .AddSupportedCultures(cultures)
+        .AddSupportedUICultures(cultures);
+
+    o.ApplyCurrentCultureToResponseHeaders = true;
+    o.FallBackToParentUICultures = true;
+
     o.RequestCultureProviders =
     [
-        new QueryStringRequestCultureProvider(),          // ?culture=en&ui-culture=en
-        new AcceptLanguageHeaderRequestCultureProvider()  // Accept-Language: en
+        new QueryStringRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider()
     ];
 });
 
+// ---------- nedelja 8: spoljni servis kursa ----------
+builder.Services.AddOptions<RatesOptions>()
+    .Bind(builder.Configuration.GetSection(RatesOptions.Section))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddMemoryCache();
+builder.Services.AddTransient<ApiKeyHandler>();
+
+var ratesClient = builder.Services.AddHttpClient<ExchangeRateClient>((sp, c) =>
+{
+    var rates = sp.GetRequiredService<IOptions<RatesOptions>>().Value;
+
+    c.BaseAddress = new Uri(rates.BaseUrl);
+    c.Timeout = TimeSpan.FromSeconds(10);
+    c.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+ratesClient.AddResilienceHandler("rates", b =>
+{
+    b.AddTimeout(TimeSpan.FromSeconds(4));
+
+    b.AddRetry(new HttpRetryStrategyOptions
+    {
+        MaxRetryAttempts = 2,
+        Delay = TimeSpan.FromMilliseconds(200),
+        BackoffType = DelayBackoffType.Exponential,
+        UseJitter = true
+    });
+
+    b.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+    {
+        FailureRatio = 0.5,
+        SamplingDuration = TimeSpan.FromSeconds(30),
+        MinimumThroughput = 5,
+        BreakDuration = TimeSpan.FromSeconds(15)
+    });
+
+    b.AddTimeout(TimeSpan.FromSeconds(1));
+});
+
+ratesClient.AddHttpMessageHandler<ApiKeyHandler>();
+
+builder.Services.AddScoped<IExchangeRateProvider, CachedExchangeRateProvider>();
+
+// ---------- nedelja 8: CORS ----------
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+builder.Services.AddCors(o =>
+{
+    o.AddPolicy("spa", policy => policy
+        .WithOrigins(allowedOrigins)
+        .WithMethods("GET", "POST", "PUT", "DELETE")
+        .WithHeaders(
+            "Authorization",
+            "Content-Type",
+            "X-Api-Version",
+            "X-Requested-With",
+            "X-SignalR-User-Agent")
+        .WithExposedHeaders("X-Pagination", "Location")
+        .AllowCredentials()
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10)));
+
+    o.AddPolicy("dev", policy => policy
+        .WithOrigins("http://localhost:5173")
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .WithExposedHeaders("X-Pagination", "Location")
+        .AllowCredentials());
+});
+
+// ---------- nedelja 8: fajlovi i SignalR ----------
+builder.Services.AddSingleton<IFileStorage, LocalDiskStorage>();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IOrderNotifier, SignalROrderNotifier>();
+
+// ---------- nedelja 9: Identity ----------
+builder.Services
+    .AddIdentityCore<AppUser>(o =>
+    {
+        o.Password.RequiredLength = 10;
+        o.Password.RequireNonAlphanumeric = false;
+        o.User.RequireUniqueEmail = true;
+        o.SignIn.RequireConfirmedEmail = false;
+        o.Lockout.MaxFailedAccessAttempts = 5;
+        o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
+
+// Sema "Bearer" je podrazumevana;
+// TokenValidationParameters popunjavamo u nedelji 10.
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o => { });
+
 var app = builder.Build();
 
-// u razvoju uvek; u produkciji samo ako je eksplicitno ukljuceno
-// (u compose-u, nedelja 14: Database__MigrateOnStartup=true)
+// ---------- baza i Identity seed ----------
 if (app.Environment.IsDevelopment() ||
     app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
+    // Prvo migracija, jer Identity tabele moraju postojati.
     await app.Services.MigrateDatabaseAsync();
+
+    // Zatim seed Admin/Customer uloga i admin korisnika.
+    using var scope = app.Services.CreateScope();
+
+    await IdentitySeeder.SeedAsync(
+        scope.ServiceProvider,
+        app.Configuration);
 }
 
-// 2) sastavljanje middleware pipeline-a (redosled = redosled izvrsavanja)
-app.UseMiddleware<RequestTiming>();        // prvi: meri i sve ispod sebe
+app.UseMiddleware<RequestTiming>();
 
-app.UseExceptionHandler();        // uvek: 400 za ValidationException, 500 za ostalo
-app.UseRequestLocalization();     // pre MapControllers: akcija vidi kulturu zahteva
+app.UseExceptionHandler();
+
+app.UseRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();             // /openapi/v1.json
-    app.MapScalarApiReference();  // /scalar/v1
-}
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();       // detalji greske samo u razvoju
-    app.MapOpenApi();                      // /openapi/v1.json
-    app.MapScalarApiReference();           // /scalar/v1
-}
-else
-{
-    app.UseExceptionHandler();             // GlobalExceptionHandler -> problem+json
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+        ctx.Context.Response.Headers.XContentTypeOptions = "nosniff"
+});
+
 app.UseRouting();
+
+app.UseCors(
+    app.Environment.IsDevelopment()
+        ? "dev"
+        : "spa");
+
+// Identity autentifikacija mora biti pre autorizacije.
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
+app.MapHub<OrderHub>("/hubs/orders");
 
 app.Run();
