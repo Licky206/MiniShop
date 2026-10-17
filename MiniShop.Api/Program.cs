@@ -57,8 +57,41 @@ builder.Services.AddOpenApi("v1", o =>
                 Scheme = "bearer",
                 BearerFormat = "JWT",
                 Description =
-                    "JWT pristupni token, bez prefiksa Bearer (izdaje se od nedelje 10)."
+                    "JWT pristupni token, bez prefiksa Bearer."
             };
+
+        return Task.CompletedTask;
+    });
+
+    // ---------- nedelja 11: autorizacija u OpenAPI ----------
+    // Svaka operacija dobija red "Autorizacija: <pravilo>"
+    // izveden iz EndpointMetadata.
+    o.AddOperationTransformer((operation, context, ct) =>
+    {
+        var metadata =
+            context.Description.ActionDescriptor.EndpointMetadata;
+
+        string rule;
+
+        if (metadata.OfType<IAllowAnonymous>().Any())
+        {
+            rule = "javno, bez tokena";
+        }
+        else
+        {
+            var policies = metadata
+                .OfType<IAuthorizeData>()
+                .Select(a => a.Policy ?? a.Roles ?? "prijava")
+                .Distinct()
+                .ToList();
+
+            rule = policies.Count == 0
+                ? "prijava (FallbackPolicy)"
+                : string.Join(" + ", policies);
+        }
+
+        operation.Description =
+            $"{operation.Description}\n\nAutorizacija: {rule}".Trim();
 
         return Task.CompletedTask;
     });
@@ -193,11 +226,110 @@ builder.Services
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// Sema "Bearer" je podrazumevana;
-// TokenValidationParameters popunjavamo u nedelji 10.
+// ---------- nedelja 10: JWT ----------
+
+// JwtOptions se ucitava iz:
+// - appsettings.json: Issuer, Audience, AccessTokenMinutes, RefreshTokenDays
+// - User Secrets: Jwt:Key
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(
+        o => Encoding.UTF8.GetByteCount(o.Key) >= 32,
+        "Jwt:Key mora imati najmanje 32 bajta (HS256).")
+    .ValidateOnStart();
+
+// Servisi za access i refresh tokene.
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<RefreshTokenService>();
+
+// Bearer je podrazumevana authentication sema.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o => { });
+    .AddJwtBearer();
+
+// Parametri za validaciju JWT access tokena.
+builder.Services
+    .AddOptions<JwtBearerOptions>(
+        JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((o, jwtOptions) =>
+    {
+        var jwt = jwtOptions.Value;
+
+        // sub -> ClaimTypes.NameIdentifier
+        // role -> ClaimTypes.Role
+        o.MapInboundClaims = true;
+
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt.Key)),
+
+            ValidAlgorithms =
+            [
+                SecurityAlgorithms.HmacSha256
+            ],
+
+            ValidateIssuer = true,
+            ValidIssuer = jwt.Issuer,
+
+            ValidateAudience = true,
+            ValidAudience = jwt.Audience,
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+
+            RoleClaimType = ClaimTypes.Role,
+            NameClaimType = ClaimTypes.Email
+        };
+
+        o.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                string? token =
+                    ctx.Request.Query["access_token"];
+
+                // Query-string token dozvoljavamo samo SignalR hubovima.
+                if (!string.IsNullOrEmpty(token) &&
+                    ctx.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    ctx.Token = token;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+// ---------- nedelja 11: autorizacija ----------
+
+// Zatvoreno po podrazumevanom + imenovane politike.
+builder.Services.AddAuthorization(options =>
+{
+    // [Authorize] bez imena politike: validan Bearer token
+    options.DefaultPolicy =
+        new AuthorizationPolicyBuilder(
+            JwtBearerDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .Build();
+
+    // Endpoint BEZ ikakvog atributa: isto sto i [Authorize].
+    options.FallbackPolicy = options.DefaultPolicy;
+
+    // Samo korisnici sa Admin rolom.
+    options.AddPolicy("AdminOnly", p =>
+        p.RequireRole("Admin"));
+
+    // Vlasnik resursa ili Admin.
+    options.AddPolicy("SameOwner", p =>
+        p.Requirements.Add(new SameOwnerRequirement()));
+});
+
+// Handler nema zavisnosti -> Singleton.
+builder.Services.AddSingleton<IAuthorizationHandler, OrderOwnerHandler>();
 
 var app = builder.Build();
 
@@ -205,10 +337,10 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment() ||
     app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
-    // Prvo migracija, jer Identity tabele moraju postojati.
+    // Prvo migracije.
     await app.Services.MigrateDatabaseAsync();
 
-    // Zatim seed Admin/Customer uloga i admin korisnika.
+    // Zatim Identity seed.
     using var scope = app.Services.CreateScope();
 
     await IdentitySeeder.SeedAsync(
@@ -222,14 +354,18 @@ app.UseExceptionHandler();
 
 app.UseRequestLocalization();
 
+// OpenAPI i Scalar moraju ostati javno dostupni,
+// iako je FallbackPolicy sada ukljucena.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
 
+// Static files moraju biti PRE UseAuthorization().
+// Tako /images/... ostaje javno dostupan.
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -243,7 +379,7 @@ app.UseCors(
         ? "dev"
         : "spa");
 
-// Identity autentifikacija mora biti pre autorizacije.
+// Authentication mora biti pre Authorization.
 app.UseAuthentication();
 app.UseAuthorization();
 

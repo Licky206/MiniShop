@@ -4,6 +4,7 @@ namespace MiniShop.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize(Policy = "AdminOnly")]
 public class ProductsController(IProductService svc) : ControllerBase
 {
     // dozvoljeni tipovi: MIME tip -> (magicni bajtovi, ekstenzija na disku)
@@ -23,6 +24,7 @@ public class ProductsController(IProductService svc) : ControllerBase
     /// <response code="200">Paginirana kolekcija proizvoda.</response>
     /// <response code="400">Nedozvoljeno polje za sortiranje.</response>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(PagedResult<ProductDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<ProductDto>>> Get(
@@ -47,6 +49,7 @@ public class ProductsController(IProductService svc) : ControllerBase
     /// <response code="200">Proizvod; polje priceEur izostaje kada kurs nije poznat.</response>
     /// <response code="404">Proizvod ne postoji.</response>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ProductDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
@@ -64,6 +67,7 @@ public class ProductsController(IProductService svc) : ControllerBase
 
     /// <summary>Pet najskupljih aktivnih proizvoda.</summary>
     [HttpGet("featured")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<ProductDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ProductDto>>> Featured(CancellationToken ct)
     {

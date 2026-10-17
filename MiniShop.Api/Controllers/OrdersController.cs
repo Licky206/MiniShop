@@ -3,86 +3,84 @@
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
 [ApiVersion("1.0")]
+[Authorize]                                     // svaka akcija trazi validan token
 public class OrdersController(
     ICheckoutService checkout,
     IOrderRepository orders,
     IUnitOfWork uow,
-    IOrderNotifier notifier) : ControllerBase
+    IOrderNotifier notifier,
+    IAuthorizationService authz) : ControllerBase
 {
-    /// <summary>Kreira narudzbenicu za prijavljenog korisnika.</summary>
-    /// <response code="201">Narudzbenica je kreirana.</response>
-    /// <response code="401">Korisnik nije prijavljen.</response>
+    /// <summary>Kreira narudzbenicu prijavljenog korisnika.</summary>
+    /// <remarks>Autorizacija: prijavljen korisnik.</remarks>
     [HttpPost]
     [ProducesResponseType(typeof(OrderDto), StatusCodes.Status201Created)]
-    public async Task<IActionResult> Create(
-        OrderCreateDto dto,
-        CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Create(OrderCreateDto dto, CancellationToken ct)
     {
-        // Id korisnika samo iz claimsa; X-Demo-User vise ne postoji.
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (userId is null)
-            return Challenge();
-
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var result = await checkout.PlaceOrderAsync(userId, dto, ct);
-
         if (!result.IsSuccess)
             return this.ToProblem(result.Error!.Value);
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new
-            {
-                id = result.Value!.Id,
-                version = "1"
-            },
-            result.Value);
+        return CreatedAtAction(nameof(GetById),
+            new { id = result.Value!.Id, version = "1" }, result.Value);
     }
 
-    /// <summary>Narudzbenica sa stavkama i nazivima proizvoda.</summary>
+    /// <summary>Narudzbenice prijavljenog korisnika, najnovije prve.</summary>
+    /// <remarks>Autorizacija: prijavljen korisnik; vidi samo svoje.</remarks>
+    [HttpGet("mine")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<OrderSummaryDto>>> Mine(CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        return Ok(await orders.GetMineAsync(userId, ct));
+    }
+
+    /// <summary>Narudzbenica sa stavkama.</summary>
+    /// <remarks>Autorizacija: vlasnik ili Admin (politika SameOwner).</remarks>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
+        // resurs se prvo ucita, pa se proverava pravo nad njim
         var order = await orders.GetByIdAsync(id, ct);
+        if (order is null)
+            return this.ToProblem(new Error(ErrorType.NotFound, "order-not-found",
+                "Narudzbenica ne postoji."));
 
-        return order is null
-            ? this.ToProblem(new Error(
-                ErrorType.NotFound,
-                "order-not-found",
-                "Narudzbenica ne postoji."))
-            : Ok(order.ToDto());
+        var ok = await authz.AuthorizeAsync(User, order, "SameOwner");
+        if (!ok.Succeeded)
+            return this.ToProblem(new Error(ErrorType.Forbidden, "not-owner",
+                "Narudzbenica pripada drugom korisniku."));
+
+        return Ok(order.ToDto());
     }
 
-    /// <summary>Menja status i javlja ga SignalR klijentima grupe order-{id}.</summary>
-    /// <response code="204">Status je promenjen.</response>
+    /// <summary>Promena statusa; klijenti dobijaju SignalR dogadjaj (nedelja 8).</summary>
+    /// <remarks>Autorizacija: politika AdminOnly.</remarks>
     [HttpPost("{id:int}/status")]
-    // privremeno bez autorizacije; od nedelje 11: [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "AdminOnly")]           // uz [Authorize] klase: prijava I uloga Admin
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SetStatus(
-        int id,
-        OrderStatusUpdateDto dto,
-        CancellationToken ct)
+        int id, OrderStatusUpdateDto dto, CancellationToken ct)
     {
-        // JsonStringEnumConverter prima i broj, pa {"status": 42} mora da se odbije ovde
-        if (!Enum.IsDefined(dto.Status))
-            return this.ToProblem(new Error(
-                ErrorType.Validation,
-                "invalid-status",
+        if (!Enum.IsDefined(dto.Status))   // nedelja 8: {"status": 42} se odbija
+            return this.ToProblem(new Error(ErrorType.Validation, "invalid-status",
                 "Nepoznat status narudzbenice."));
 
         var order = await orders.GetByIdAsync(id, ct);
-
         if (order is null)
-            return this.ToProblem(new Error(
-                ErrorType.NotFound,
-                "order-not-found",
+            return this.ToProblem(new Error(ErrorType.NotFound, "order-not-found",
                 "Narudzbenica ne postoji."));
 
         order.Status = dto.Status;
-
-        await uow.SaveChangesAsync(ct);                                // prvo baza
-        await notifier.StatusChangedAsync(order.Id, order.Status, ct); // pa obavestenje
-
+        await uow.SaveChangesAsync(ct);
+        await notifier.StatusChangedAsync(order.Id, order.Status, ct);
         return NoContent();
     }
 }

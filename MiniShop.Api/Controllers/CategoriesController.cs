@@ -4,16 +4,19 @@
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize(Policy = "AdminOnly")]
 public class CategoriesController(ICategoryService svc) : ControllerBase
 {
     /// <summary>Sve kategorije, po nazivu.</summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<CategoryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<CategoryDto>>> Get(CancellationToken ct)
         => Ok(await svc.GetAllAsync(ct));
 
     /// <summary>Jedna kategorija.</summary>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)

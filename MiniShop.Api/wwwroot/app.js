@@ -6,7 +6,9 @@ const log = (text) => {
 };
 
 const conn = new signalR.HubConnectionBuilder()
-    .withUrl("/hubs/orders")
+    .withUrl("/hubs/orders", {
+        accessTokenFactory: () => localStorage.getItem("accessToken") ?? ""
+    })
     .withAutomaticReconnect()
     .build();
 

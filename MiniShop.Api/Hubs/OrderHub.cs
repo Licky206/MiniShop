@@ -4,7 +4,7 @@
 /// Hub na /hubs/orders. Klijent se pretplacuje na grupu order-{id};
 /// server salje dogadjaj "statusChanged" preko IHubContext (SignalROrderNotifier).
 /// </summary>
-// [Authorize] od nedelje 10, kada postoji JWT (token stize kroz accessTokenFactory)
+[Authorize]   // nedelja 10: token stize kao access_token u query stringu (OnMessageReceived)
 public sealed class OrderHub : Hub
 {
     public static string GroupName(int orderId) => $"order-{orderId}";
