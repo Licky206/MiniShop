@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using MiniShop.Api.Data;
+using MiniShop.Data;
 
 #nullable disable
 
-namespace MiniShop.Api.Data.Migrations
+namespace MiniShop.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -22,7 +22,7 @@ namespace MiniShop.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("MiniShop.Api.Models.Category", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Category", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -69,7 +69,7 @@ namespace MiniShop.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Order", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Order", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -101,7 +101,7 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("Orders", (string)null);
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.OrderItem", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.OrderItem", b =>
                 {
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
@@ -123,7 +123,7 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("OrderItems", (string)null);
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Product", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -179,7 +179,7 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("Products", (string)null);
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.ShippingAddress", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.ShippingAddress", b =>
                 {
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
@@ -209,7 +209,7 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("ShippingAddresses", (string)null);
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Tag", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Tag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -263,15 +263,15 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("ProductTags");
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.OrderItem", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.OrderItem", b =>
                 {
-                    b.HasOne("MiniShop.Api.Models.Order", "Order")
+                    b.HasOne("MiniShop.Domain.Entities.Order", "Order")
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("MiniShop.Api.Models.Product", "Product")
+                    b.HasOne("MiniShop.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -282,9 +282,9 @@ namespace MiniShop.Api.Data.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Product", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Product", b =>
                 {
-                    b.HasOne("MiniShop.Api.Models.Category", "Category")
+                    b.HasOne("MiniShop.Domain.Entities.Category", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -293,11 +293,11 @@ namespace MiniShop.Api.Data.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.ShippingAddress", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.ShippingAddress", b =>
                 {
-                    b.HasOne("MiniShop.Api.Models.Order", "Order")
+                    b.HasOne("MiniShop.Domain.Entities.Order", "Order")
                         .WithOne("Shipping")
-                        .HasForeignKey("MiniShop.Api.Models.ShippingAddress", "OrderId")
+                        .HasForeignKey("MiniShop.Domain.Entities.ShippingAddress", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -306,25 +306,25 @@ namespace MiniShop.Api.Data.Migrations
 
             modelBuilder.Entity("ProductTags", b =>
                 {
-                    b.HasOne("MiniShop.Api.Models.Product", null)
+                    b.HasOne("MiniShop.Domain.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("MiniShop.Api.Models.Tag", null)
+                    b.HasOne("MiniShop.Domain.Entities.Tag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Category", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Order", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
 

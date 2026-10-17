@@ -1,4 +1,4 @@
-﻿namespace MiniShop.Api.Models;
+﻿namespace MiniShop.Domain.Entities;
 
 // spojna tabela sa podacima; kompozitni kljuc (OrderId, ProductId)
 public class OrderItem

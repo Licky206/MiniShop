@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using MiniShop.Api.Data;
+using MiniShop.Data;
 
 #nullable disable
 
-namespace MiniShop.Api.Data.Migrations
+namespace MiniShop.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20261017125146_InitialCreate")]
@@ -25,7 +25,7 @@ namespace MiniShop.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("MiniShop.Api.Models.Category", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Category", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -72,7 +72,7 @@ namespace MiniShop.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Product", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -123,9 +123,9 @@ namespace MiniShop.Api.Data.Migrations
                     b.ToTable("Products", (string)null);
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Product", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Product", b =>
                 {
-                    b.HasOne("MiniShop.Api.Models.Category", "Category")
+                    b.HasOne("MiniShop.Domain.Entities.Category", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -134,7 +134,7 @@ namespace MiniShop.Api.Data.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("MiniShop.Api.Models.Category", b =>
+            modelBuilder.Entity("MiniShop.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
                 });

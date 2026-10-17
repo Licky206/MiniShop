@@ -1,4 +1,4 @@
-﻿namespace MiniShop.Api.Models;
+﻿namespace MiniShop.Domain.Entities;
 
 public class Product
 {

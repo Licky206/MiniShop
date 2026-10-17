@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using MiniShop.Api.Models;
+using MiniShop.Domain.Entities;
 
-namespace MiniShop.Api.Data.Configurations;
+namespace MiniShop.Data.Configurations;
 
 public class ProductConfiguration : IEntityTypeConfiguration<Product>
 {

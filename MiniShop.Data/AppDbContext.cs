@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using MiniShop.Api.Models;
+using MiniShop.Domain.Entities;
 
-namespace MiniShop.Api.Data;
+namespace MiniShop.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : DbContext(options)

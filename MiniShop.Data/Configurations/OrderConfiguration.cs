@@ -1,4 +1,4 @@
-﻿namespace MiniShop.Api.Data.Configurations;
+﻿namespace MiniShop.Data.Configurations;
 
 public class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
