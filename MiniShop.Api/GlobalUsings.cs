@@ -36,3 +36,7 @@ global using MiniShop.Api.Extensions;
 global using MiniShop.Api.Filters;
 global using MiniShop.Api.Middleware;
 global using MiniShop.Api.Options;
+
+global using Asp.Versioning;
+global using Microsoft.OpenApi;
+global using Microsoft.AspNetCore.Localization;

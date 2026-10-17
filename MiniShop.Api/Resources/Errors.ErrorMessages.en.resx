@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="product-not-found" xml:space="preserve">
+    <value>The product does not exist.</value>
+  </data>
+  <data name="duplicate-sku" xml:space="preserve">
+    <value>A product with this SKU already exists.</value>
+  </data>
+  <data name="concurrency-conflict" xml:space="preserve">
+    <value>The product was changed in the meantime. Reload it.</value>
+  </data>
+  <data name="category-not-found" xml:space="preserve">
+    <value>The category does not exist.</value>
+  </data>
+  <data name="duplicate-slug" xml:space="preserve">
+    <value>A category with this slug already exists.</value>
+  </data>
+  <data name="category-not-empty" xml:space="preserve">
+    <value>The category has products and cannot be deleted.</value>
+  </data>
+  <data name="order-not-found" xml:space="preserve">
+    <value>The order does not exist.</value>
+  </data>
+  <data name="insufficient-stock" xml:space="preserve">
+    <value>Not enough stock for one of the products.</value>
+  </data>
+</root>

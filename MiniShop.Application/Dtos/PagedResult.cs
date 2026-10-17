@@ -1,4 +1,9 @@
 ﻿namespace MiniShop.Application.Dtos;
 
-// jedna strana rezultata; u nedelji 7 dobija TotalPages, HasNext i HasPrevious
-public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+// jedna strana rezultata; izracunata svojstva se serijalizuju kao i obicna
+public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+{
+    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+    public bool HasNext => Page < TotalPages;
+    public bool HasPrevious => Page > 1;
+}

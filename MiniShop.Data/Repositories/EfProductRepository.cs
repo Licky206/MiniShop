@@ -2,6 +2,8 @@
 
 public sealed class EfProductRepository(AppDbContext db) : IProductRepository
 {
+    private const int MaxPageSize = 100;
+
     public Task<Product?> GetByIdAsync(int id, CancellationToken ct)
         => db.Products
             .Include(p => p.Category)
@@ -15,10 +17,15 @@ public sealed class EfProductRepository(AppDbContext db) : IProductRepository
 
     public async Task<PagedResult<ProductDto>> GetPageAsync(ProductQuery q, CancellationToken ct)
     {
-        IQueryable<Product> query = db.Products.Where(p => p.IsActive);
+        // granice: pageSize 1..100 (DoS), page tako da (page - 1) * size ne prekoraci int
+        var size = Math.Clamp(q.PageSize, 1, MaxPageSize);
+        var page = Math.Clamp(q.Page, 1, int.MaxValue / MaxPageSize);
 
-        var search = q.Search;
-        if (!string.IsNullOrWhiteSpace(search))
+        // 1) filter: samo zadati parametri, svaka kombinacija dobija jednostavan SQL
+        IQueryable<Product> query = db.Products.AsNoTracking().Where(p => p.IsActive);
+
+        var search = q.Search?.Trim();
+        if (!string.IsNullOrEmpty(search))
             query = query.Where(p => p.Name.Contains(search));
         if (q.CategoryId is int categoryId)
             query = query.Where(p => p.CategoryId == categoryId);
@@ -27,24 +34,20 @@ public sealed class EfProductRepository(AppDbContext db) : IProductRepository
         if (q.MaxPrice is decimal max)
             query = query.Where(p => p.Price <= max);
 
+        // 2) sort iz whitelist-a + ThenBy(Id); nepoznat kljuc -> 400 pre ikakvog upita
+        var sorted = ProductSortMap.Apply(query, q.Sort);
+
+        // 3) COUNT nad filtriranim upitom, pre Skip/Take
         var total = await query.CountAsync(ct);
 
-        // privremeno kao u nedelji 4; whitelist mapa i ThenBy(Id) stizu u nedelji 7
-        query = q.Sort switch
-        {
-            "price" => query.OrderBy(p => p.Price),
-            "price_desc" => query.OrderByDescending(p => p.Price),
-            "name_desc" => query.OrderByDescending(p => p.Name),
-            _ => query.OrderBy(p => p.Name)
-        };
-
-        var items = await query
-            .Skip((q.Page - 1) * q.PageSize)
-            .Take(q.PageSize)
+        // 4) strana i 5) projekcija: jedan SELECT sa OFFSET/FETCH i samo kolonama DTO-a
+        var items = await sorted
+            .Skip((page - 1) * size)
+            .Take(size)
             .Select(ProductMappings.Projection)
             .ToListAsync(ct);
 
-        return new PagedResult<ProductDto>(items, q.Page, q.PageSize, total);
+        return new PagedResult<ProductDto>(items, page, size, total);
     }
 
     public Task<bool> SkuExistsAsync(string sku, CancellationToken ct)

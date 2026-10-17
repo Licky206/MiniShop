@@ -1,52 +1,47 @@
-@HostAddress = https://localhost:7150
+### 1) strana 2 od 3 -> 200, items: Proizvod 06..10, totalCount 12, totalPages 3,
+###    hasNext true, hasPrevious true; isti podaci u zaglavlju X-Pagination
+GET https://localhost:7150/api/v1/products?page=2&pageSize=5
 
-### 1) Kategorije iz seed podataka -> 200, tri stavke
-GET {{HostAddress}}/api/categories
+### 2) kategorija + sort -> 200, totalCount 4, prvi "Proizvod 12" (12000), poslednji "Proizvod 03"
+GET https://localhost:7150/api/v1/products?categoryId=1&sort=price_desc
 
-###
-### 2) Kreiranje proizvoda -> 201, Location: /api/products/1
-POST {{HostAddress}}/api/products
+### 3) cena 5000-9000 -> 200, totalCount 5 (Proizvod 05..09)
+GET https://localhost:7150/api/v1/products?minPrice=5000&maxPrice=9000
+
+### 4) pretraga -> 200, totalCount 3 (Proizvod 10, 11, 12)
+GET https://localhost:7150/api/v1/products?search=Proizvod%201
+
+### 5) preveliki pageSize -> 200, "pageSize": 100, dvanaest stavki, totalPages 1
+GET https://localhost:7150/api/v1/products?pageSize=1000
+
+### 6) nedozvoljen sort -> 400, type .../errors/validation, errors.sort sa spiskom polja
+GET https://localhost:7150/api/v1/products?sort=weight
+
+### 7) stara ruta bez verzije -> 404
+GET https://localhost:7150/api/products
+
+### 8) nova kategorija -> 201, Location: /api/v1/categories/4
+POST https://localhost:7150/api/v1/categories
 Content-Type: application/json
 
-{
-  "name": "Tastatura",
-  "sku": "KB-100",
-  "description": "Mehanicka, US raspored",
-  "price": 4990,
-  "stockQuantity": 12,
-  "categoryId": 1
-}
+{ "name": "Kablovi", "slug": "kablovi" }
 
-###
-### 3) Isti SKU -> 409, type: https://minishop.rs/errors/duplicate-sku
-POST {{HostAddress}}/api/products
+### 9) isti slug -> 409, type .../errors/duplicate-slug
+POST https://localhost:7150/api/v1/categories
 Content-Type: application/json
 
-{
-  "name": "Druga tastatura",
-  "sku": "KB-100",
-  "price": 5990,
-  "stockQuantity": 3,
-  "categoryId": 1
-}
+{ "name": "Kablovi i adapteri", "slug": "kablovi" }
 
-###
-### 4) Lista -> 200, category: "Periferija" (JOIN iz projekcije)
-GET {{HostAddress}}/api/products?categoryId=1&sort=price
-
-###
-### 5) Izmena -> 204; zatim GET /api/products/1 vraca price 4490
-PUT {{HostAddress}}/api/products/1
+### 10) izmena -> 204; brisanje prazne -> 204
+PUT https://localhost:7150/api/v1/categories/4
 Content-Type: application/json
 
-{
-  "name": "Tastatura",
-  "price": 4490,
-  "stockQuantity": 10,
-  "categoryId": 1,
-  "isActive": true
-}
+{ "name": "Kablovi i adapteri", "slug": "kablovi-adapteri" }
 
 ###
-### 6) Nepostojeci -> 404, type: https://minishop.rs/errors/product-not-found
-GET {{HostAddress}}/api/products/999
+DELETE https://localhost:7150/api/v1/categories/4
+
+### 11) kategorija sa proizvodima -> 409, type .../errors/category-not-empty
+DELETE https://localhost:7150/api/v1/categories/1
+
+### 12) jezik: bez zaglavlja title "Proizvod 999 ne postoji.", Content-Language: sr-Latn-RS
