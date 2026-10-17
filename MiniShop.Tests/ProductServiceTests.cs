@@ -88,4 +88,5 @@ public class ProductServiceTests
             .WithErrorMessage("Kategorija ne postoji.");
         result.ShouldNotHaveValidationErrorFor(x => x.Sku);
     }
+
 }

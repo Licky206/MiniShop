@@ -10,6 +10,10 @@ public static class ProductMappings
     public static ProductDto ToDto(this Product p) =>
         new(p.Id, p.Name, p.Sku, p.Price, p.StockQuantity, p.Category?.Name ?? "");
 
+    public static ProductDetailsDto ToDetailsDto(this Product p, decimal? priceEur) =>
+        new(p.Id, p.Name, p.Sku, p.Price, p.StockQuantity, p.Category?.Name ?? "",
+            p.ImageUrl, priceEur);
+
     public static Product ToEntity(this ProductCreateDto d) => new()
     {
         Name = d.Name,
@@ -31,4 +35,6 @@ public static class ProductMappings
         p.IsActive = d.IsActive;
         p.UpdatedAt = DateTime.UtcNow;
     }
+
+
 }

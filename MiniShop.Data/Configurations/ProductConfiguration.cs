@@ -10,6 +10,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(p => p.Name).IsRequired().HasMaxLength(120);
         b.Property(p => p.Sku).IsRequired().HasMaxLength(32);
         b.Property(p => p.Description).HasMaxLength(2000);
+        b.Property(p => p.ImageUrl).HasMaxLength(300);
         b.Property(p => p.Price).HasColumnType("decimal(18,2)");
         // CreatedAt se postavlja u kodu (= DateTime.UtcNow), ne HasDefaultValueSql
 

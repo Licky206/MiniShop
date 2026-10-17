@@ -40,3 +40,13 @@ global using MiniShop.Api.Options;
 global using Asp.Versioning;
 global using Microsoft.OpenApi;
 global using Microsoft.AspNetCore.Localization;
+
+global using System.Net.Http.Json;                     // ReadFromJsonAsync
+global using Microsoft.AspNetCore.SignalR;
+global using Microsoft.Extensions.Caching.Memory;      // IMemoryCache
+global using Microsoft.Extensions.Http.Resilience;     // paket Microsoft.Extensions.Http.Resilience
+global using Polly;                                    // DelayBackoffType, dolazi uz Resilience
+global using MiniShop.Api.Clients;
+global using MiniShop.Api.Http;
+global using MiniShop.Api.Hubs;
+global using MiniShop.Api.Storage;

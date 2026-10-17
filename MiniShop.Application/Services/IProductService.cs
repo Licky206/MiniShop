@@ -1,6 +1,4 @@
-﻿namespace MiniShop.Application.Services;
-
-public interface IProductService
+﻿public interface IProductService
 {
     Task<PagedResult<ProductDto>> GetPageAsync(ProductQuery q, CancellationToken ct);
     Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct);
@@ -9,4 +7,9 @@ public interface IProductService
     Task<Result<ProductDto>> CreateAsync(ProductCreateDto dto, CancellationToken ct);
     Task<Result<ProductDto>> UpdateAsync(int id, ProductUpdateDto dto, CancellationToken ct);
     Task<Result<bool>> DeleteAsync(int id, CancellationToken ct);
+
+    // nedelja 8
+    Task<Result<ProductDetailsDto>> GetDetailsAsync(int id, CancellationToken ct);
+    Task<Result<string>> SetImageAsync(int id, string fileName, Stream content,
+        string contentType, CancellationToken ct);
 }

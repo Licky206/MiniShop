@@ -16,4 +16,5 @@ public class Product
     public List<Tag> Tags { get; set; } = [];
     // optimisticka konkurentnost; IsRowVersion() je u ProductConfiguration
     public byte[]? RowVersion { get; set; }
+    public string? ImageUrl { get; set; }
 }
