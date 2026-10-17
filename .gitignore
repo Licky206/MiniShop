@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+MiniShop.Api/wwwroot/images/*
+!MiniShop.Api/wwwroot/images/.gitkeep

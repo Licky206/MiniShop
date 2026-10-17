@@ -36,22 +36,24 @@ public class ProductsController(IProductService svc) : ControllerBase
         return Ok(page);
     }
 
-    /// <summary>Jedan proizvod po Id-ju.</summary>
+    /// <summary>Detalji proizvoda, sa cenom u evrima kada je kurs poznat.</summary>
+    /// <response code="200">Proizvod; polje priceEur izostaje kada kurs nije poznat.</response>
     /// <response code="404">Proizvod ne postoji.</response>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(int id, CancellationToken ct)
+    [ProducesResponseType(typeof(ProductDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetById(int id, CancellationToken ct)
     {
-        var r = await svc.GetByIdAsync(id, ct);
-        if (!r.IsSuccess) return this.ToProblem(r.Error!.Value);
+        var result = await svc.GetDetailsAsync(id, ct);
+        if (!result.IsSuccess)
+            return this.ToProblem(result.Error!.Value);
 
-        // verzija reda u ETag-u, kao u petoj nedelji: klijent je vraca u PUT-u kao rowVersion
+        // ETag sa verzijom reda ostaje (nedelje 5 i 6)
         var version = await svc.GetRowVersionAsync(id, ct);
         if (version is not null)
             Response.Headers.ETag = $"\"{Convert.ToBase64String(version)}\"";
 
-        return Ok(r.Value);
+        return Ok(result.Value);
     }
 
     /// <summary>Pet najskupljih aktivnih proizvoda.</summary>
