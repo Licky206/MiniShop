@@ -4,7 +4,6 @@ namespace MiniShop.Api.Controllers;
 [Route("api/[controller]")]
 public class ProductsController(IProductService svc) : ControllerBase
 {
-    // GET /api/products?search=&categoryId=&minPrice=&maxPrice=&sort=&page=&pageSize=
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ProductDto>>> Get(
         [FromQuery] ProductQuery q, CancellationToken ct)
@@ -14,13 +13,18 @@ public class ProductsController(IProductService svc) : ControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var product = await svc.GetByIdAsync(id, ct);
-        return product is null
-            ? this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
-                "Proizvod ne postoji."))
-            : Ok(product);
+        if (product is null)
+            return this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
+                "Proizvod ne postoji."));
+
+        // verzija koju klijent vraca u PUT-u kao rowVersion (bez navodnika)
+        var version = await svc.GetRowVersionAsync(id, ct);
+        if (version is not null)
+            Response.Headers.ETag = $"\"{Convert.ToBase64String(version)}\"";
+
+        return Ok(product);
     }
 
-    // fiksni segment; ne sudara se sa {id:int} jer "featured" nije broj
     [HttpGet("featured")]
     public async Task<ActionResult<IReadOnlyList<ProductDto>>> Featured(CancellationToken ct)
         => Ok(await svc.GetAllAsync(
@@ -34,7 +38,6 @@ public class ProductsController(IProductService svc) : ControllerBase
             return this.ToProblem(new Error(ErrorType.Conflict, "duplicate-sku",
                 "Proizvod sa tim SKU vec postoji."));
 
-        // 201 + Location: /api/products/{id}
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
@@ -42,11 +45,8 @@ public class ProductsController(IProductService svc) : ControllerBase
     public async Task<IActionResult> Update(
         int id, ProductUpdateDto dto, CancellationToken ct)
     {
-        var updated = await svc.UpdateAsync(id, dto, ct);
-        return updated is null
-            ? this.ToProblem(new Error(ErrorType.NotFound, "product-not-found",
-                "Proizvod ne postoji."))
-            : NoContent();
+        var (_, error) = await svc.UpdateAsync(id, dto, ct);
+        return error is { } e ? this.ToProblem(e) : NoContent();   // 404 ili 409
     }
 
     [HttpDelete("{id:int}")]

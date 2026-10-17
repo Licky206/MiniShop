@@ -22,4 +22,8 @@ public sealed class ProductUpdateDto
 
     // podrazumevano true: izostavljeno polje ne sme da sakrije proizvod
     public bool IsActive { get; init; } = true;
+
+    // nedelja 5: verzija iz ETag zaglavlja GET /api/products/{id} (JSON: Base64).
+    // null = bez provere konkurentnosti (poslednji upis pobedjuje)
+    public byte[]? RowVersion { get; init; }
 }

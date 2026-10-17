@@ -1,3 +1,5 @@
+using MiniShop.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // jezik poruka iz .resx: do nedelje 7 fiksno srpski; tada ga bira Accept-Language.
@@ -38,10 +40,35 @@ builder.Services.AddOptions<CatalogOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-// katalog: lista je u memoriji -> Singleton; od nedelje 4 AddScoped (DbContext)
-builder.Services.AddSingleton<IProductService, InMemoryProductService>();
+// baza: EF Core + SQL Server
+builder.Services.AddDbContext<AppDbContext>(o =>
+{
+    o.UseSqlServer(
+        builder.Configuration.GetConnectionString("Default"),
+        sql => sql.EnableRetryOnFailure(3));
+
+    if (builder.Environment.IsDevelopment())
+    {
+        o.EnableSensitiveDataLogging();   // vrednosti parametara u logu - samo lokalno
+        o.EnableDetailedErrors();
+    }
+});
+
+// DbContext je Scoped, pa i servis koji ga koristi mora biti Scoped
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 
 var app = builder.Build();
+
+// u razvoju uvek; u produkciji samo ako je eksplicitno ukljuceno
+// (u compose-u, nedelja 14: Database__MigrateOnStartup=true)
+if (app.Environment.IsDevelopment() ||
+    app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
 
 // 2) sastavljanje middleware pipeline-a (redosled = redosled izvrsavanja)
 app.UseMiddleware<RequestTiming>();        // prvi: meri i sve ispod sebe

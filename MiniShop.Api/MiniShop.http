@@ -1,17 +1,52 @@
-@host = https://localhost:7150
+@HostAddress = https://localhost:7150
 
-### Lista proizvoda
-GET {{host}}/api/products
-Accept: application/json
+### 1) Kategorije iz seed podataka -> 200, tri stavke
+GET {{HostAddress}}/api/categories
 
-### Jedan proizvod
-GET {{host}}/api/products/1
-Accept: application/json
+###
+### 2) Kreiranje proizvoda -> 201, Location: /api/products/1
+POST {{HostAddress}}/api/products
+Content-Type: application/json
 
-### Nepostojeci proizvod -> 404
-GET {{host}}/api/products/999
-Accept: application/json
+{
+  "name": "Tastatura",
+  "sku": "KB-100",
+  "description": "Mehanicka, US raspored",
+  "price": 4990,
+  "stockQuantity": 12,
+  "categoryId": 1
+}
 
-### Neispravan id -> 404 vec od rutiranja ({id:int})
-GET {{host}}/api/products/abc
-Accept: application/json
+###
+### 3) Isti SKU -> 409, type: https://minishop.rs/errors/duplicate-sku
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Druga tastatura",
+  "sku": "KB-100",
+  "price": 5990,
+  "stockQuantity": 3,
+  "categoryId": 1
+}
+
+###
+### 4) Lista -> 200, category: "Periferija" (JOIN iz projekcije)
+GET {{HostAddress}}/api/products?categoryId=1&sort=price
+
+###
+### 5) Izmena -> 204; zatim GET /api/products/1 vraca price 4490
+PUT {{HostAddress}}/api/products/1
+Content-Type: application/json
+
+{
+  "name": "Tastatura",
+  "price": 4490,
+  "stockQuantity": 10,
+  "categoryId": 1,
+  "isActive": true
+}
+
+###
+### 6) Nepostojeci -> 404, type: https://minishop.rs/errors/product-not-found
+GET {{HostAddress}}/api/products/999

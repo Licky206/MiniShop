@@ -33,3 +33,17 @@ global using MiniShop.Api.Filters;
 global using MiniShop.Api.Middleware;
 global using MiniShop.Api.Options;
 global using MiniShop.Api.Services;
+
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.Metadata.Builders;
+global using MiniShop.Api.Models;
+
+global using System.Linq.Expressions;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.Metadata.Builders;
+global using MiniShop.Api.Data;
+global using MiniShop.Api.Dtos;
+global using MiniShop.Api.Errors;
+global using MiniShop.Api.Extensions;
+global using MiniShop.Api.Models;
+global using MiniShop.Api.Services;
