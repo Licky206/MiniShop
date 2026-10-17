@@ -1,7 +1,4 @@
-// Kod u skripti NE nosi using direktive. Ovaj fajl ih daje globalno,
-// pa se kod iz skripte kopira i odmah kompajlira. Redove dodajemo
-// po nedeljama; redovi za pakete koji jos nisu dodati ostaju
-// zakomentarisani (inace greska CS0246).
+// Kod u skripti NE nosi using direktive. Ovaj fajl ih daje globalno.
 
 // ---------- nedelja 1-3: osnove, kontroleri, validacija ----------
 global using System.ComponentModel.DataAnnotations;
@@ -20,30 +17,22 @@ global using Microsoft.Extensions.Localization;     // IStringLocalizer
 global using Microsoft.Extensions.Options;          // IOptions<T>
 global using Scalar.AspNetCore;                     // paket Scalar.AspNetCore
 
-// ---------- nedelja 4-6: EF Core, slojevi, validacija ----------
-// global using Microsoft.EntityFrameworkCore;                  // paket (nedelja 4)
-// global using Microsoft.EntityFrameworkCore.Metadata.Builders;
-// global using FluentValidation;                               // paket (nedelja 6)
+// ---------- nedelja 4-6: EF Core (tranzitivno iz MiniShop.Data), slojevi ----------
+global using Microsoft.EntityFrameworkCore;
+
+// ---------- slojevi (nedelja 6) ----------
+global using MiniShop.Domain.Entities;
+global using MiniShop.Application;
+global using MiniShop.Application.Abstractions;
+global using MiniShop.Application.Common;
+global using MiniShop.Application.Dtos;
+global using MiniShop.Application.Mapping;
+global using MiniShop.Application.Services;
+global using MiniShop.Data;
 
 // ---------- namespace-ovi projekta MiniShop.Api ----------
-global using MiniShop.Api.Dtos;
 global using MiniShop.Api.Errors;
 global using MiniShop.Api.Extensions;
 global using MiniShop.Api.Filters;
 global using MiniShop.Api.Middleware;
 global using MiniShop.Api.Options;
-global using MiniShop.Api.Services;
-
-global using Microsoft.EntityFrameworkCore;
-global using Microsoft.EntityFrameworkCore.Metadata.Builders;
-global using MiniShop.Api.Models;
-
-global using System.Linq.Expressions;
-global using Microsoft.EntityFrameworkCore;
-global using Microsoft.EntityFrameworkCore.Metadata.Builders;
-global using MiniShop.Api.Data;
-global using MiniShop.Api.Dtos;
-global using MiniShop.Api.Errors;
-global using MiniShop.Api.Extensions;
-global using MiniShop.Api.Models;
-global using MiniShop.Api.Services;

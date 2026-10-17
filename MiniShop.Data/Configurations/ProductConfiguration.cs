@@ -1,8 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using MiniShop.Domain.Entities;
-
-namespace MiniShop.Data.Configurations;
+﻿namespace MiniShop.Data.Configurations;
 
 public class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
@@ -17,6 +13,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(p => p.Price).HasColumnType("decimal(18,2)");
         // CreatedAt se postavlja u kodu (= DateTime.UtcNow), ne HasDefaultValueSql
 
+        // isto sto i [Timestamp]: rowversion kolona i token konkurentnosti
+        b.Property(p => p.RowVersion).IsRowVersion();
+
         b.HasIndex(p => p.Sku).IsUnique().HasDatabaseName("UX_Products_Sku");
         b.HasIndex(p => new { p.CategoryId, p.IsActive });
 
@@ -24,5 +23,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasOne(p => p.Category).WithMany(c => c.Products)
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
+        // N:M ka Tag je u TagConfiguration (nedelja 5)
     }
 }

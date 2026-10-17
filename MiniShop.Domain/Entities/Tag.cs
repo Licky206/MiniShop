@@ -4,5 +4,5 @@ public class Tag
 {
     public int Id { get; set; }
     public string Name { get; set; } = "";
-    public List<Product> Products { get; set; } = [];   // N:M preko ProductTags
+    public List<Product> Products { get; set; } = [];
 }
