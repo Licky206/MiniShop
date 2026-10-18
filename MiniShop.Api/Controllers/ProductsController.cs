@@ -20,7 +20,6 @@ public class ProductsController(IProductService svc) : ControllerBase
     /// <response code="304">Klijent vec ima aktuelnu verziju (If-None-Match).</response>
     [HttpGet]
     [AllowAnonymous]
-    [OutputCache(PolicyName = "Catalog")]
     [ProducesResponseType(typeof(PagedResult<ProductDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<IActionResult> Get(
