@@ -99,3 +99,88 @@ Content-Type: application/json
 { "items": [ { "productId": 1, "quantity": 1 } ],
   "shipping": { "street": "Bulevar oslobodjenja 1", "city": "Novi Sad",
                 "postalCode": "21000", "country": "RS" } }
+
+
+
+
+/////JWT
+
+# ako @host vec postoji na vrhu fajla, sledeci red preskocite
+@host = https://localhost:7150
+
+### 1) registracija kupca -> 201 (400 DuplicateUserName ako postoji iz nedelje 9)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!", "fullName": "Petar Kupac" }
+
+### 2) prijava -> 200 { accessToken, expiresAt, refreshToken }
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!" }
+
+###
+@token = {{login.response.body.$.accessToken}}
+@refresh = {{login.response.body.$.refreshToken}}
+
+### 3) bez tokena -> 401, WWW-Authenticate: Bearer
+GET {{host}}/api/v1/orders/mine
+
+### 4) sa tokenom -> 200, [] za novog kupca
+GET {{host}}/api/v1/orders/mine
+Authorization: Bearer {{token}}
+
+### 5) narudzbenica -> 201, Location: /api/v1/orders/{id}
+POST {{host}}/api/v1/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [ { "productId": 1, "quantity": 1 } ],
+  "shipping": { "street": "Bulevar oslobodjenja 1", "city": "Novi Sad",
+                "postalCode": "21000", "country": "RS" }
+}
+
+### 6) ko sam ja -> 200, roles: ["Customer"]
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{token}}
+
+### 7) rotacija -> 200, nov accessToken i nov refreshToken
+# @name refresh1
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh}}" }
+
+### 8) isti (vec iskorisceni) refresh token ponovo -> 401, porodica opozvana
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh}}" }
+
+### 9) i token dobijen u koraku 7 je sada opozvan -> 401
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh1.response.body.$.refreshToken}}" }
+
+### 10) nova prijava, pa odjava -> 204
+# @name login2
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!" }
+
+###
+POST {{host}}/api/v1/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{login2.response.body.$.refreshToken}}" }
+
+### 11) refresh posle odjave -> 401
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login2.response.body.$.refreshToken}}" }
