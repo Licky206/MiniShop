@@ -24,6 +24,7 @@ public class AuthController(
 
     /// <summary>Prijava: access token (15 min) i refresh token (14 dana).</summary>
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login(LoginDto dto, CancellationToken ct)
     {

@@ -4,7 +4,8 @@ public sealed class CheckoutService(
     IProductRepository products,
     IOrderRepository orders,
     IUnitOfWork uow,
-    IValidator<OrderCreateDto> validator) : ICheckoutService
+    IValidator<OrderCreateDto> validator,
+    IOrderQueue queue) : ICheckoutService
 {
     public async Task<Result<OrderDto>> PlaceOrderAsync(
         string userId, OrderCreateDto dto, CancellationToken ct)
@@ -58,6 +59,9 @@ public sealed class CheckoutService(
         order.Total = order.Items.Sum(i => i.Quantity * i.UnitPrice);
         orders.Add(order);
         await uow.SaveChangesAsync(ct);   // jedna transakcija: Order + stavke + adresa + zalihe
+
+        // nedelja 13: posao u red TEK posle uspesnog upisa; kontroler vraca 202
+        await queue.EnqueueAsync(new OrderJob(order.Id), ct);
 
         return Result.Success(order.ToDto());
     }

@@ -184,3 +184,134 @@ POST {{host}}/api/v1/auth/refresh
 Content-Type: application/json
 
 { "refreshToken": "{{login2.response.body.$.refreshToken}}" }
+
+
+
+//TEST 11 KORAK
+### 0) tri prijave: admin, kupac, drugi kupac (drugog najpre registrujte)
+# @name admin
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "admin@minishop.rs", "password": "<Seed:AdminPassword iz User Secrets>" }
+
+###
+# @name kupac
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "kupac@minishop.rs", "password": "Lozinka123!" }
+
+###
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{ "email": "kupac2@minishop.rs", "password": "Lozinka123!", "fullName": "Drugi Kupac" }
+
+###
+# @name kupac2
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "kupac2@minishop.rs", "password": "Lozinka123!" }
+
+###
+@adminToken = {{admin.response.body.$.accessToken}}
+@kupacToken = {{kupac.response.body.$.accessToken}}
+@kupac2Token = {{kupac2.response.body.$.accessToken}}
+
+### 1) javni katalog bez tokena -> 200
+GET {{host}}/api/v1/products?page=1&pageSize=5
+
+### 2) kategorije bez tokena -> 200
+GET {{host}}/api/v1/categories
+
+### 3) kreiranje proizvoda bez tokena -> 401
+POST {{host}}/api/v1/products
+Content-Type: application/json
+
+{ "name": "Mis", "sku": "MS-200", "price": 1990, "stockQuantity": 5, "categoryId": 1 }
+
+### 4) isto sa tokenom kupca -> 403
+POST {{host}}/api/v1/products
+Authorization: Bearer {{kupacToken}}
+Content-Type: application/json
+
+{ "name": "Mis", "sku": "MS-200", "price": 1990, "stockQuantity": 5, "categoryId": 1 }
+
+### 5) isto sa admin tokenom -> 201
+POST {{host}}/api/v1/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Mis", "sku": "MS-200", "price": 1990, "stockQuantity": 5, "categoryId": 1 }
+
+### 6) brisanje kategorije kao kupac -> 403
+DELETE {{host}}/api/v1/categories/3
+Authorization: Bearer {{kupacToken}}
+
+### 7) kupac cita svoju narudzbenicu (Id iz GET orders/mine) -> 200
+GET {{host}}/api/v1/orders/1
+Authorization: Bearer {{kupacToken}}
+
+### 8) drugi kupac cita istu -> 403, type https://minishop.rs/errors/not-owner
+GET {{host}}/api/v1/orders/1
+Authorization: Bearer {{kupac2Token}}
+
+### 9) admin cita istu -> 200
+GET {{host}}/api/v1/orders/1
+Authorization: Bearer {{adminToken}}
+
+### 10) promena statusa kao kupac -> 403, kao admin -> 204
+POST {{host}}/api/v1/orders/1/status
+Authorization: Bearer {{kupacToken}}
+Content-Type: application/json
+
+{ "status": "Shipped" }
+
+###
+POST {{host}}/api/v1/orders/1/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "Shipped" }
+
+### 11) OpenAPI dokument bez tokena -> 200
+GET {{host}}/openapi/v1.json
+
+
+
+
+
+//REDIS
+
+### 1) prvi poziv -> 200, ETag: W/"<vreme>-<broj>", Cache-Control: public, max-age=60
+###    u konzoli: SQL upit ka Products
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5
+
+### 2) isti poziv -> 200, zaglavlje Age (odgovor iz output kesa), bez SQL-a u konzoli
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5
+
+### 3) drugi filter -> 200, drugaciji rezultat (VaryByQuery radi), nema Age
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5&categoryId=2
+
+### 4) uslovni GET sa ETag-om iz odgovora 1 -> 304, prazno telo
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5
+If-None-Match: W/"20260924101500123-12"
+
+### 5) prijava admina (Seed:AdminEmail, lozinka iz User Secrets) -> 200, accessToken
+POST https://localhost:7150/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "admin@minishop.rs", "password": " Admin!Lozinka2026" }
+
+### 6) novi proizvod -> 201; invalidacija HybridCache i output kesa
+POST https://localhost:7150/api/v1/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Mis bezicni", "sku": "MS-300", "price": 1990, "stockQuantity": 25, "categoryId": 1 }
+
+### 7) stari ETag -> 200 (ne 304), novi ETag sa brojem N+1, totalCount veci za 1
+GET https://localhost:7150/api/v1/products?page=1&pageSize=5
+If-None-Match: W/"20260924101500123-12"

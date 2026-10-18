@@ -483,3 +483,4 @@ $RECYCLE.BIN/
 
 MiniShop.Api/wwwroot/images/*
 !MiniShop.Api/wwwroot/images/.gitkeep
+.env

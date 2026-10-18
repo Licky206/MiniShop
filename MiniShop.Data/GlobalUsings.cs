@@ -16,3 +16,5 @@ global using Microsoft.AspNetCore.Identity;                        // UserManage
 global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;    // IdentityDbContext
 global using Microsoft.Extensions.Configuration;                   // IConfiguration
 global using Microsoft.Extensions.DependencyInjection;             // GetRequiredService
+
+global using MiniShop.Application.Caching;   // CatalogStamp u EfProductRepository

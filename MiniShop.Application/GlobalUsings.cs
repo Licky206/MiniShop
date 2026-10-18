@@ -9,3 +9,8 @@ global using MiniShop.Application.Dtos;
 global using MiniShop.Application.Mapping;
 global using MiniShop.Application.Services;
 global using MiniShop.Application.Validators;
+global using Microsoft.Extensions.Caching.Hybrid;
+global using MiniShop.Application.Caching;
+
+global using Microsoft.Extensions.Logging;                 // ILogger<T> u OrderProcessor
+global using MiniShop.Application.Orders;                  // OrderJob u IOrderQueue i CheckoutService

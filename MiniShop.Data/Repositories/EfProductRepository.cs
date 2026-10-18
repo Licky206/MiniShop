@@ -59,4 +59,15 @@ public sealed class EfProductRepository(AppDbContext db) : IProductRepository
     public void Add(Product product) => db.Products.Add(product);
 
     public void Remove(Product product) => db.Products.Remove(product);
+
+    public async Task<CatalogStamp> GetCatalogStampAsync(CancellationToken ct)
+    {
+        // SELECT MAX(COALESCE([p].[UpdatedAt], [p].[CreatedAt])) FROM [Products] AS [p]
+        var last = await db.Products
+            .MaxAsync(p => (DateTime?)(p.UpdatedAt ?? p.CreatedAt), ct);
+        var count = await db.Products.CountAsync(ct);
+
+        // prazna tabela: MAX vraca NULL
+        return new CatalogStamp(last ?? DateTime.MinValue, count);
+    }
 }

@@ -57,3 +57,21 @@ global using System.IdentityModel.Tokens.Jwt;             // JwtSecurityToken, c
 global using System.Security.Cryptography;                // SHA256, RandomNumberGenerator
 global using Microsoft.IdentityModel.Tokens;              // SymmetricSecurityKey, Base64UrlEncoder
 global using MiniShop.Api.Auth;
+
+global using Microsoft.AspNetCore.OutputCaching;       // AddOutputCache, [OutputCache], IOutputCacheStore
+global using Microsoft.Extensions.Caching.Hybrid;      // HybridCacheEntryOptions u Program.cs
+global using MiniShop.Application.Caching;
+global using MiniShop.Api.Caching;
+global using System.Threading.Channels;                    // Channel<OrderJob>
+global using System.Threading.RateLimiting;                // RateLimitPartition, MetadataName
+global using Microsoft.AspNetCore.RateLimiting;            // [EnableRateLimiting]
+global using Microsoft.Extensions.Diagnostics.HealthChecks;   // HealthCheckResult
+global using Microsoft.AspNetCore.Diagnostics.HealthChecks;   // HealthCheckOptions
+global using MiniShop.Application.Orders;
+global using MiniShop.Api.Workers;
+
+global using Serilog;                               // paket Serilog.AspNetCore
+global using Serilog.Formatting.Compact;            // paket Serilog.Formatting.Compact
+global using OpenTelemetry.Resources;               // paket OpenTelemetry.Extensions.Hosting
+global using OpenTelemetry.Trace;
+global using OpenTelemetry.Metrics;

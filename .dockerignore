@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/*.user
+**/*.db
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+.env
+MiniShop.Tests/
+TestResults/

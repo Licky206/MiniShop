@@ -1,0 +1,44 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: >-
+        Server=sql;Database=MiniShop;User Id=sa;Password=${SA_PW};Encrypt=False
+      ConnectionStrings__Redis: "redis:6379"
+      Database__MigrateOnStartup: "true"
+      Jwt__Key: "${JWT_KEY}"
+      Seed__AdminPassword: "${ADMIN_PW}"
+      Rates__ApiKey: "dev-key"
+    volumes:
+      - images:/app/wwwroot/images
+    depends_on:
+      sql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SA_PW}"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -U sa -P "$$MSSQL_SA_PASSWORD" -Q 'SELECT 1' || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+
+volumes:
+  images:
+  sqldata:

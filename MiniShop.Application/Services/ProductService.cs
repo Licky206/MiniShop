@@ -133,4 +133,6 @@ public sealed class ProductService(
     private static Result<T> Invalid<T>(FluentValidation.Results.ValidationResult v)
         => Result.Fail<T>(ErrorType.Validation, "validation",
             string.Join(" ", v.Errors.Select(e => e.ErrorMessage)));
+    public Task<CatalogStamp> GetCatalogStampAsync(CancellationToken ct)
+    => repo.GetCatalogStampAsync(ct);
 }

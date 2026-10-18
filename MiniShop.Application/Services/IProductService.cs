@@ -1,4 +1,6 @@
-﻿public interface IProductService
+﻿namespace MiniShop.Application.Services;
+
+public interface IProductService
 {
     Task<PagedResult<ProductDto>> GetPageAsync(ProductQuery q, CancellationToken ct);
     Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct);
@@ -12,4 +14,7 @@
     Task<Result<ProductDetailsDto>> GetDetailsAsync(int id, CancellationToken ct);
     Task<Result<string>> SetImageAsync(int id, string fileName, Stream content,
         string contentType, CancellationToken ct);
+
+    // nedelja 12: pecat za ETag kataloga
+    Task<CatalogStamp> GetCatalogStampAsync(CancellationToken ct);
 }

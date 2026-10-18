@@ -18,4 +18,6 @@ public interface IProductRepository
 
     void Add(Product product);
     void Remove(Product product);
+    /// <summary>MAX(COALESCE(UpdatedAt, CreatedAt)) i COUNT(*) nad Products.</summary>
+    Task<CatalogStamp> GetCatalogStampAsync(CancellationToken ct);
 }   

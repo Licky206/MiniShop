@@ -64,8 +64,6 @@ builder.Services.AddOpenApi("v1", o =>
     });
 
     // ---------- nedelja 11: autorizacija u OpenAPI ----------
-    // Svaka operacija dobija red "Autorizacija: <pravilo>"
-    // izveden iz EndpointMetadata.
     o.AddOperationTransformer((operation, context, ct) =>
     {
         var metadata =
@@ -113,6 +111,10 @@ builder.Services
         builder.Configuration,
         builder.Environment.IsDevelopment())
     .AddApplicationLayer();
+
+// ---------- nedelja 13: red poslova i pozadinski potrosac ----------
+builder.Services.AddSingleton<IOrderQueue, ChannelOrderQueue>();
+builder.Services.AddHostedService<OrderWorker>();
 
 // ---------- lokalizacija (nedelja 7) ----------
 var cultures = new[] { "sr-Latn-RS", "sr-Cyrl-RS", "en" };
@@ -316,7 +318,7 @@ builder.Services.AddAuthorization(options =>
             .RequireAuthenticatedUser()
             .Build();
 
-    // Endpoint BEZ ikakvog atributa: isto sto i [Authorize].
+    // Endpoint bez ikakvog atributa: isto sto i [Authorize].
     options.FallbackPolicy = options.DefaultPolicy;
 
     // Samo korisnici sa Admin rolom.
@@ -329,18 +331,164 @@ builder.Services.AddAuthorization(options =>
 });
 
 // Handler nema zavisnosti -> Singleton.
-builder.Services.AddSingleton<IAuthorizationHandler, OrderOwnerHandler>();
+builder.Services.AddSingleton<
+    IAuthorizationHandler,
+    OrderOwnerHandler>();
 
+// ---------- nedelja 12: Redis, HybridCache i Output caching ----------
+
+// L2 kes: Redis
+builder.Services.AddStackExchangeRedisCache(o =>
+{
+    o.Configuration =
+        builder.Configuration.GetConnectionString("Redis");
+
+    o.InstanceName = "minishop:";
+});
+
+// L1 + L2 iza jednog API-ja.
+builder.Services.AddHybridCache(o =>
+{
+    o.MaximumPayloadBytes = 1024 * 1024;
+
+    o.DefaultEntryOptions = new HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(5),
+        LocalCacheExpiration = TimeSpan.FromMinutes(1)
+    };
+});
+
+// Kes celog HTTP odgovora.
+// Nema bazne politike: kesira se samo ono sto oznacimo politikom "Catalog".
+builder.Services.AddOutputCache(o =>
+{
+    o.AddPolicy("Catalog", b => b
+        .Expire(TimeSpan.FromMinutes(2))
+        .SetVaryByQuery(
+            "search",
+            "categoryId",
+            "minPrice",
+            "maxPrice",
+            "sort",
+            "page",
+            "pageSize")
+        .Tag(CacheKeys.CatalogTag));
+});
+
+// Application sloj zna samo za ICatalogCacheInvalidator.
+// Konkretna Output Cache implementacija ostaje u Api sloju.
+builder.Services.AddSingleton<
+    ICatalogCacheInvalidator,
+    OutputCacheCatalogInvalidator>();
+
+// ---------- nedelja 13: rate limiting ----------
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    o.AddPolicy(
+        "login",
+        ctx => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey:
+                ctx.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    o.OnRejected = async (ctx, ct) =>
+    {
+        var retryAfter =
+            ctx.Lease.TryGetMetadata(
+                MetadataName.RetryAfter,
+                out var wait)
+                ? (int)Math.Ceiling(wait.TotalSeconds)
+                : 60;
+
+        ctx.HttpContext.Response.Headers.RetryAfter =
+            retryAfter.ToString();
+
+        await ctx.HttpContext.Response.WriteAsJsonAsync(
+            new ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Type = "https://minishop.rs/errors/too-many-requests",
+                Title = "Previse zahteva",
+                Detail = $"Pokusajte ponovo za {retryAfter} s.",
+                Instance = ctx.HttpContext.Request.Path
+            },
+            options: null,
+            contentType: "application/problem+json",
+            ct);
+    };
+});
+
+// ---------- nedelja 13: health checks ----------
+builder.Services.AddHealthChecks()
+    .AddCheck(
+        "self",
+        () => HealthCheckResult.Healthy(),
+        tags: ["live"])
+    .AddDbContextCheck<AppDbContext>(
+        "db",
+        tags: ["ready"])
+    .AddRedis(
+        builder.Configuration.GetConnectionString("Redis")!,
+        name: "redis",
+        tags: ["ready"]);
+
+// ---------- nedelja 14: Serilog ----------
+builder.Host.UseSerilog((ctx, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("service", "minishop-api")
+    .WriteTo.Console(new CompactJsonFormatter())
+    .WriteTo.Seq(ctx.Configuration["Seq:Url"]!));
+
+// ---------- nedelja 14: OpenTelemetry ----------
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r =>
+        r.AddService("minishop-api"))
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter())
+    .WithMetrics(m => m
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddOtlpExporter());
+
+// ---------- nedelja 14: granice zahteva ----------
+// Globalni limit je 1 MB.
+// Upload slike iz nedelje 8 ima [RequestSizeLimit(5 MB)],
+// pa taj endpoint moze da prihvati do 5 MB.
+builder.WebHost.ConfigureKestrel(k =>
+{
+    k.Limits.MaxRequestBodySize = 1 * 1024 * 1024;
+    k.AddServerHeader = false;
+});
+
+// HSTS za produkciju.
+builder.Services.AddHsts(o =>
+{
+    o.MaxAge = TimeSpan.FromDays(180);
+    o.IncludeSubDomains = true;
+});
+
+// ---------- build ----------
 var app = builder.Build();
 
 // ---------- baza i Identity seed ----------
 if (app.Environment.IsDevelopment() ||
     app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
-    // Prvo migracije.
     await app.Services.MigrateDatabaseAsync();
 
-    // Zatim Identity seed.
     using var scope = app.Services.CreateScope();
 
     await IdentitySeeder.SeedAsync(
@@ -348,29 +496,40 @@ if (app.Environment.IsDevelopment() ||
         app.Configuration);
 }
 
-app.UseMiddleware<RequestTiming>();
+// ---------- middleware pipeline ----------
 
+// Mora biti prvi da bi hvatao izuzetke iz kasnijeg pipeline-a.
 app.UseExceptionHandler();
 
-app.UseRequestLocalization();
+// Jedan strukturirani log po HTTP zahtevu.
+app.UseSerilogRequestLogging();
 
-// OpenAPI i Scalar moraju ostati javno dostupni,
-// iako je FallbackPolicy sada ukljucena.
+app.UseMiddleware<RequestTiming>();
+
+// OpenAPI i Scalar ostaju javni u Development okruzenju.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 
-// Static files moraju biti PRE UseAuthorization().
-// Tako /images/... ostaje javno dostupan.
+// Security headers moraju biti pre statickih fajlova.
+app.UseMiddleware<SecurityHeaders>();
+
+// /images/... ostaje javno dostupan.
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
         ctx.Context.Response.Headers.XContentTypeOptions = "nosniff"
 });
+
+app.UseRequestLocalization();
 
 app.UseRouting();
 
@@ -379,11 +538,55 @@ app.UseCors(
         ? "dev"
         : "spa");
 
-// Authentication mora biti pre Authorization.
+app.UseRateLimiter();
+
 app.UseAuthentication();
+
 app.UseAuthorization();
 
+// Output cache posle CORS/auth middleware-a, pre endpointa.
+app.UseOutputCache();
+
+// ---------- endpointi ----------
 app.MapControllers();
+
 app.MapHub<OrderHub>("/hubs/orders");
 
+// ---------- health checks ----------
+
+// Liveness: samo proces odgovara.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false
+}).AllowAnonymous();
+
+// Readiness: baza + Redis.
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = c => c.Tags.Contains("ready"),
+
+    ResponseWriter = (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json";
+
+        return ctx.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                durationMs =
+                    (int)e.Value.Duration.TotalMilliseconds
+            })
+        });
+    }
+}).AllowAnonymous();
+
 app.Run();
+
+// WebApplicationFactory<Program> u MiniShop.Tests
+public partial class Program
+{
+}
