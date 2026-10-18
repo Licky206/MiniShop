@@ -28,6 +28,11 @@ jobs:
       - run: >-
           dotnet ef migrations script --idempotent
           -o migrate.sql -p MiniShop.Data -s MiniShop.Api
+        env:
+          Jwt__Key: "ci-kljuc-samo-za-migracioni-skript-0123456789"
+          Rates__ApiKey: "ci"
+          ConnectionStrings__Default: "Server=localhost;Database=MiniShop;User Id=sa;Password=x;TrustServerCertificate=True"
+          ConnectionStrings__Redis: "localhost:6379"
       - run: dotnet publish MiniShop.Api -c Release -o out
 
       - uses: actions/upload-artifact@v4
