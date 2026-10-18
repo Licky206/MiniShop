@@ -339,22 +339,3 @@ GET http://localhost:8080/api/v1/products/999999
 
 
 
-
-
-
-///AUTH
-### 1) prijava admina u kontejneru (lozinka = ADMIN_PW iz .env) -> 200, accessToken
-POST http://localhost:8080/api/v1/auth/login
-Content-Type: application/json
-
-{ "email": "admin@minishop.rs", "password": "{{adminPassword}}" }
-
-### 2) admin kreira proizvod -> 201
-POST http://localhost:8080/api/v1/products
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{ "name": "Monitor 27", "sku": "MN-270", "price": 32990, "stockQuantity": 5, "categoryId": 2 }
-
-### 3) nepostojeci proizvod u Production -> 404, ProblemDetails sa traceId, bez stack trace-a
-GET http://localhost:8080/api/v1/products/999999
